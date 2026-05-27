@@ -125,6 +125,31 @@
                 </div>
             </div>
 
+            <!-- Personalized Stats Panel -->
+            <div id="personal-stats-panel" class="personal-stats-panel glass-panel" style="display: none;">
+                <div class="personal-stats-header">
+                    <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem;">Personalised Analysis: <span id="personal-runner-name" style="color: var(--primary);"></span></h2>
+                    <button id="clear-personal-btn" class="pagination-btn">Clear Selection</button>
+                </div>
+                <div class="personal-stats-content">
+                    <div class="personal-stat-box">
+                        <div class="personal-stat-label">Position in Selection</div>
+                        <div class="personal-stat-value" id="personal-runner-pos">--</div>
+                    </div>
+                    <div class="personal-stat-box">
+                        <div class="personal-stat-label">Percentile</div>
+                        <div class="personal-stat-value" id="personal-runner-percentile">--</div>
+                    </div>
+                    <div class="personal-stat-box">
+                        <div class="personal-stat-label">Time (<span id="personal-time-type-label">Chip</span>)</div>
+                        <div class="personal-stat-value" id="personal-runner-time">--:--:--</div>
+                    </div>
+                </div>
+                <div class="personal-stats-footer" id="personal-stats-message">
+                    <!-- Dynamic message -->
+                </div>
+            </div>
+
             <!-- Histogram Chart Panel -->
             <div class="chart-panel glass-panel">
                 <div class="chart-header">

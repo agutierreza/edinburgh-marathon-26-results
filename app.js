@@ -15,6 +15,7 @@ let currentPage = 1;
 const pageSize = 25;
 let filteredData = [];
 let chartInstance = null;
+let selectedRunner = null;
 
 // Initialisation when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -161,6 +162,59 @@ function initialiseEventListeners() {
             renderTable();
         }
     });
+
+    // Clear Personal Selection Button
+    const clearPersonalBtn = document.getElementById('clear-personal-btn');
+    if (clearPersonalBtn) {
+        clearPersonalBtn.addEventListener('click', () => {
+            selectedRunner = null;
+            applyFiltersAndRender();
+        });
+    }
+
+    // Table Action Buttons (Event Delegation)
+    document.getElementById('table-body').addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-view-stats')) {
+            const bib = e.target.getAttribute('data-bib');
+            const runner = marathonData.find(r => String(r.bib) === String(bib));
+            if (runner) {
+                selectRunner(runner);
+            }
+        }
+    });
+}
+
+/**
+ * Sets the selected runner, updates filters to match their cohort, and re-renders
+ */
+function selectRunner(runner) {
+    selectedRunner = runner;
+    
+    // Update filters
+    selectedGender = runner.gender;
+    
+    // Update UI buttons
+    document.querySelectorAll('.gender-btn').forEach(b => b.classList.remove('active'));
+    const genderBtn = document.querySelector(`.gender-btn[data-gender="${runner.gender}"]`);
+    if (genderBtn) genderBtn.classList.add('active');
+
+    // Update age groups (keep only runner's age group)
+    selectedAgeGroups = [runner.age];
+    
+    // Update UI checkboxes
+    const checkboxes = document.querySelectorAll('#age-groups-container input[type="checkbox"]');
+    checkboxes.forEach(cb => {
+        cb.checked = (cb.value === runner.age);
+    });
+
+    // Clear search
+    searchQuery = '';
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
+
+    // Render (this will re-calculate stats for the new cohort)
+    currentPage = 1;
+    applyFiltersAndRender();
 }
 
 /**
@@ -205,11 +259,11 @@ function applyFiltersAndRender() {
             return false;
         }
         
-        // Search query (matches name, club, or dorsal/bib number)
+        // Search query (matches name, club, or exact dorsal/bib number)
         if (searchQuery) {
             const nameMatch = runner.name.toLowerCase().includes(searchQuery);
             const clubMatch = runner.club.toLowerCase().includes(searchQuery);
-            const bibMatch = runner.bib && String(runner.bib).includes(searchQuery);
+            const bibMatch = runner.bib && String(runner.bib) === searchQuery;
             if (!nameMatch && !clubMatch && !bibMatch) {
                 return false;
             }
@@ -228,9 +282,56 @@ function applyFiltersAndRender() {
     // Update Stats
     calculateStatistics();
     
+    // Update Personal Stats if applicable
+    updatePersonalStats();
+    
     // Render chart and table
     renderCharts();
     renderTable();
+}
+
+/**
+ * Calculates and displays the personalised percentile and stats for the selected runner
+ */
+function updatePersonalStats() {
+    const panel = document.getElementById('personal-stats-panel');
+    if (!panel) return;
+    
+    if (!selectedRunner) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'flex';
+    document.getElementById('personal-runner-name').textContent = selectedRunner.name;
+    document.getElementById('personal-time-type-label').textContent = timeType === 'chip' ? 'Chip' : 'Gun';
+    
+    // Find the selected runner in the CURRENT filteredData
+    const runnerIndex = filteredData.findIndex(r => String(r.bib) === String(selectedRunner.bib));
+    
+    if (runnerIndex === -1) {
+        // They were filtered out by the user's manual filter changes!
+        document.getElementById('personal-runner-pos').textContent = '--';
+        document.getElementById('personal-runner-percentile').textContent = '--';
+        document.getElementById('personal-runner-time').textContent = '--:--:--';
+        document.getElementById('personal-stats-message').textContent = 'This runner is currently hidden by your active filters.';
+    } else {
+        const pos = runnerIndex + 1;
+        const total = filteredData.length;
+        // Percentile is the percentage of people they beat or tied (so 100 - (pos/total)*100) or just "Top X%"
+        const percentile = total > 1 ? ((pos / total) * 100).toFixed(1) : 100;
+        
+        document.getElementById('personal-runner-pos').textContent = `${pos.toLocaleString()} of ${total.toLocaleString()}`;
+        document.getElementById('personal-runner-percentile').textContent = `Top ${percentile}%`;
+        document.getElementById('personal-runner-time').textContent = timeType === 'chip' ? selectedRunner.ctime : (selectedRunner.gtime || selectedRunner.ctime);
+        
+        // Build descriptive message
+        const groupDesc = selectedAgeGroups.length === 1 && selectedAgeGroups[0] === selectedRunner.age && selectedGender === selectedRunner.gender 
+            ? `their specific category (${selectedGender} / ${selectedRunner.age})` 
+            : `the current custom selection of ${total.toLocaleString()} runners`;
+            
+        document.getElementById('personal-stats-message').textContent = `Based on ${timeType} time, they placed ${pos.toLocaleString()} out of ${total.toLocaleString()} in ${groupDesc}.`;
+    }
 }
 
 /**
@@ -363,14 +464,48 @@ function renderCharts() {
     const labels = bins.map(b => b.label);
     let datasets = [];
 
+    // Determine the bin index of the selected runner
+    let selectedBinIndex = -1;
+    if (selectedRunner) {
+        const rIndex = filteredData.findIndex(r => String(r.bib) === String(selectedRunner.bib));
+        if (rIndex !== -1) {
+            const selectedRunnerSecs = getSecs(selectedRunner);
+            selectedBinIndex = Math.floor((selectedRunnerSecs - binStart) / binWidthSeconds);
+        }
+    }
+
+    const getBgColor = (isMale) => {
+        const base = isMale ? 'rgba(14, 165, 233, 0.5)' : 'rgba(244, 63, 94, 0.5)';
+        const highlight = 'rgba(16, 185, 129, 0.9)'; // emerald green
+        return bins.map((b, i) => {
+            if (selectedBinIndex === i) {
+                if (isMale && selectedRunner.gender === 'Male') return highlight;
+                if (!isMale && selectedRunner.gender !== 'Male') return highlight;
+            }
+            return base;
+        });
+    };
+
+    const getBorderColor = (isMale) => {
+        const base = isMale ? '#0ea5e9' : '#f43f5e';
+        const highlight = '#10b981';
+        return bins.map((b, i) => {
+            if (selectedBinIndex === i) {
+                if (isMale && selectedRunner.gender === 'Male') return highlight;
+                if (!isMale && selectedRunner.gender !== 'Male') return highlight;
+            }
+            return base;
+        });
+    };
+
     if (selectedGender === 'All') {
         // Stacked/Overlaid male & female dataset for side-by-side comparison
         datasets = [
             {
                 label: 'Male Finishers',
                 data: bins.map(b => b.maleCount),
-                backgroundColor: 'rgba(14, 165, 233, 0.4)',
-                borderColor: '#0ea5e9',
+                backgroundColor: getBgColor(true),
+                borderColor: getBorderColor(true),
                 borderWidth: 1.5,
                 borderRadius: 4,
                 barPercentage: 1.0,
@@ -379,8 +514,8 @@ function renderCharts() {
             {
                 label: 'Female Finishers',
                 data: bins.map(b => b.femaleCount),
-                backgroundColor: 'rgba(244, 63, 94, 0.4)',
-                borderColor: '#f43f5e',
+                backgroundColor: getBgColor(false),
+                borderColor: getBorderColor(false),
                 borderWidth: 1.5,
                 borderRadius: 4,
                 barPercentage: 1.0,
@@ -391,8 +526,8 @@ function renderCharts() {
         datasets = [{
             label: 'Male Finishers',
             data: bins.map(b => b.maleCount),
-            backgroundColor: 'rgba(14, 165, 233, 0.5)',
-            borderColor: '#0ea5e9',
+            backgroundColor: getBgColor(true),
+            borderColor: getBorderColor(true),
             borderWidth: 1.5,
             borderRadius: 4,
             barPercentage: 1.0,
@@ -402,8 +537,8 @@ function renderCharts() {
         datasets = [{
             label: 'Female Finishers',
             data: bins.map(b => b.femaleCount),
-            backgroundColor: 'rgba(244, 63, 94, 0.5)',
-            borderColor: '#f43f5e',
+            backgroundColor: getBgColor(false),
+            borderColor: getBorderColor(false),
             borderWidth: 1.5,
             borderRadius: 4,
             barPercentage: 1.0,
@@ -564,7 +699,12 @@ function renderTable() {
         row.innerHTML = `
             <td style="font-weight: 700;">#${runner.pos || '-'}</td>
             <td style="font-family: monospace; font-weight: 600;">${runner.bib || '-'}</td>
-            <td style="font-weight: 500; color: white;">${escapeHtml(runner.name)}</td>
+            <td style="font-weight: 500; color: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span title="${escapeHtml(runner.name)}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${escapeHtml(runner.name)}</span>
+                    <button class="btn-view-stats" data-bib="${runner.bib}">Analyse</button>
+                </div>
+            </td>
             <td>${escapeHtml(runner.club)}</td>
             <td>${genderBadge}</td>
             <td style="font-weight: 600;">${runner.age}</td>
