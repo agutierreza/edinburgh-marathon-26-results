@@ -1,0 +1,9 @@
+# Python Virtual Environments
+.venv/
+__pycache__/
+*.pyc
+
+# Local Data and Scraping outputs
+*.csv
+data.js
+output.log
