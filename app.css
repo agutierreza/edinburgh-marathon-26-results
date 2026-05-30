@@ -80,14 +80,14 @@ h1 {
 /* Layout Grid */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 320px minmax(0, 1fr);
     gap: 24px;
     align-items: start;
 }
 
 @media (max-width: 1024px) {
     .dashboard-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -234,6 +234,7 @@ input[type="range"] {
     display: flex;
     flex-direction: column;
     gap: 24px;
+    min-width: 0;
 }
 
 /* Key Statistics Cards */
@@ -287,6 +288,7 @@ input[type="range"] {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 0;
 }
 
 .personal-stats-header {
@@ -337,6 +339,7 @@ input[type="range"] {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 0;
 }
 
 .chart-header {
@@ -371,6 +374,7 @@ input[type="range"] {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 0;
 }
 
 .table-header {
@@ -557,6 +561,39 @@ tr:hover td {
         gap: 8px;
     }
 }
+
+@media (max-width: 640px) {
+    body {
+        padding: 12px;
+    }
+    
+    .dashboard-grid {
+        gap: 16px;
+    }
+    
+    .main-content {
+        gap: 16px;
+    }
+    
+    .personal-stats-content {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .stat-card {
+        padding: 12px;
+    }
+    
+    .stat-value {
+        font-size: 1.2rem;
+    }
+    
+    .stats-row {
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 12px;
+    }
+}
+
 
 
 
